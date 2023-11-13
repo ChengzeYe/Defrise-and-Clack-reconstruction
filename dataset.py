@@ -8,7 +8,8 @@ from geometry_ls import Geometry
 import imageio
 from arbitrary_trajectory_ls import arbitrary_projection_matrix
 import matplotlib.pyplot as plt
-from intermediateFunction import intermediate_function
+from intermediateFunction import intermediate_function, geometry_radon_2d
+import cupy as cp
 
 
 class Projections_Dataset(Dataset):
@@ -23,13 +24,13 @@ class Projections_Dataset(Dataset):
         self.geom = list()
         # define a sub-sampling factor in angular direction
         # (all reference reconstructions are computed with full angular resolution)
-        self.angluar_sub_sampling = 1
+        self.angluar_sub_sampling = 12
         # select of voxels per mm in one direction (higher = larger res)
         # (all reference reconstructions are computed with 10)
         self.voxel_per_mm = 20
-
         self.projs_rows = 972
         self.projs_cols = 768
+        self.geom_2d = None
 
         for entry in os.scandir(data_path):
             self.loadProjections(entry.path)
@@ -56,7 +57,8 @@ class Projections_Dataset(Dataset):
         self.projs_idx = range(1200, 0, -self.angluar_sub_sampling)
         self.n_pro = self.vecs.shape[0]
         self.init_geometry()
-
+        redundancy_weight(self.vecs, self.geom_2d)
+        #intermediate_variable(self.vecs, self.geom_2d)
         # create the numpy array which will receive projection data from tiff files
         projs = np.zeros((self.n_pro, self.projs_rows, self.projs_cols), dtype=np.float32)
 
@@ -113,6 +115,7 @@ class Projections_Dataset(Dataset):
                                 number_of_projections=self.n_pro,angular_range=2 * np.pi,
                                 trajectory=arbitrary_projection_matrix, source_isocenter_distance=66, source_detector_distance=199,vecs=self.vecs)
         self.geom.append(geom)
+        self.geom_2d = geometry_radon_2d(geom)
     
     def __getitem__(self, index):
         """ Returns one instance of the dataset including image, target, weight and path."""
@@ -132,3 +135,60 @@ class Projections_Dataset(Dataset):
         """
 
         return 'Projection_Dataset'
+
+
+
+
+
+
+def intermediate_variable(vecs, geom_2d):
+    l = np.zeros((vecs.shape[0],geom_2d.number_of_projections,geom_2d.detector_shape[-1]))
+    ll = np.zeros((vecs.shape[0], geom_2d.number_of_projections, geom_2d.detector_shape[-1]))
+    lll = np.zeros((vecs.shape[0],geom_2d.number_of_projections,geom_2d.detector_shape[-1]))
+    angular_increment = 2 * np.pi / geom_2d.number_of_projections
+    gradient_vecs = np.gradient(vecs, axis=0)
+    for p, vec in enumerate(vecs):
+        print(p)
+        det_h = np.array([vec[6], vec[7], vec[8]])
+        det_v = np.array([vec[9], vec[10], vec[11]])
+        source_center_in_voxel = np.array([vec[0], vec[1], vec[2]])
+        detector_center_in_voxel = np.array([vec[3], vec[4], vec[5]])
+        axis_align_R = np.eye(3, 3)
+        axis_align_R[0:3, 0] = det_h
+        axis_align_R[0:3, 1] = det_v
+        axis_align_R[0:3, 2] = np.cross(det_h, det_v)
+        axis_align_R = np.linalg.pinv(axis_align_R)
+        gradient_vec = np.dot(axis_align_R, gradient_vecs[p, 0:3])
+        gradient_vec = gradient_vec/np.linalg.norm(gradient_vec)
+        #translation = np.array([0, np.linalg.norm(detector_center_in_voxel), 0])
+        vec = np.dot(axis_align_R, vecs[p, 0:3] - detector_center_in_voxel)
+        vec = vec/np.linalg.norm(vec)
+        s = geom_2d.detector_shape[-1]
+        cs = -(s - 1) / 2 * geom_2d.detector_spacing[-1]
+        D = np.linalg.norm(source_center_in_voxel)+np.linalg.norm(detector_center_in_voxel)
+        sd2 = D ** 2
+        for mu in range(0, geom_2d.number_of_projections):
+            for s in range(0, s):
+                ds = (s * geom_2d.detector_spacing[-1] + cs) ** 2
+                theta = np.array([D*np.cos(mu*angular_increment-np.pi/2), D*np.sin(mu*angular_increment-np.pi/2), s * geom_2d.detector_spacing[-1] + cs])/np.sqrt(sd2+ds)
+                #theta = np.array([D * np.cos(mu * angular_increment), D * np.sin(mu * angular_increment), s])/np.sqrt(sd2+ds)
+                l[p][mu, s] = np.dot(vec, theta)
+                ll[p][mu, s] = np.dot(gradient_vec, theta)
+                lll[p][mu, s] = np.dot(gradient_vec, theta)/np.sqrt(sd2+ds)
+    return np.abs(l), np.abs(ll), np.abs(lll)
+
+
+def redundancy_weight(vecs, geom_2d):
+    a = -1/(4*np.pi**2)
+    l, ll, lll = intermediate_variable(vecs, geom_2d)
+    m = 1/2
+
+    redundancy_weight = a*m*lll
+    np.save('redundancy_weight_120_100_circular', redundancy_weight)
+    print("saved")
+    return redundancy_weight
+
+
+# l : /a(lamda).theta/
+# ll: /a'(lamda).theta/
+# lll: /a'(lamda).theta//sqrt s2+D2

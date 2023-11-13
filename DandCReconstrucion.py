@@ -18,8 +18,11 @@ class Pipeline(pl.LightningModule):
         self.num_epoch = num_epoch
         self.geom_2d = geometry_radon_2d(geometry)
         self.learningRate = learning_rate
-        #self.weight_init = torch.ones((geometry.number_of_projections, self.geom_2d.number_of_projections, self.geom_2d.detector_shape[-1]))  # 这里应该是个3D的
+        #self.weight_init = -torch.ones((geometry.number_of_projections, self.geom_2d.number_of_projections, self.geom_2d.detector_shape[-1]))  # 这里应该是个3D的
         self.weight_init = torch.tensor(weight_initialization(self.geom_2d, D=self.geometry.source_detector_distance))
+        self.weight_init = torch.tensor(np.load(r'E:\MasterArbeit\code\Defrise-and-Clack-reconstruction\redundancy_weight_60_100_circular.npy'))
+        self.weight_init1 = torch.tensor(np.load(r'E:\MasterArbeit\code\Defrise-and-Clack-reconstruction\redundancy_weight.npy'))
+
         self.DandCrecon = DandCrecon(geometry=self.geometry, weight_init=self.weight_init, geom_2d=self.geom_2d)
         self.loss_fn = torch.nn.MSELoss()
         self._train_loss_agg = torchmetrics.MeanMetric()
@@ -45,6 +48,8 @@ class Pipeline(pl.LightningModule):
     def validation_step(self, batch, batch_idx):
         sinogram = batch[0]
         self.ground_truth = batch[1]
+        #plt.imshow(self.ground_truth[])
+        plt.show()
         self.output = self.forward(sinogram)
         self.output = self.preprocessing(self.output)
         loss = self.loss_fn(self.output, self.ground_truth)
@@ -79,6 +84,7 @@ class DandCrecon(torch.nn.Module):
         self.geom_2d = geom_2d
         self.backprojection_2d = ParallelBackProjection2D()
         self.backprojection_3d = ConeBackProjection3D()
+        self.relu = torch.nn.ReLU()
 
     def forward(self, sinogram):
         '''plt.imshow(sinogram[0][0][0].cpu())
@@ -91,10 +97,11 @@ class DandCrecon(torch.nn.Module):
         CB_projection = self.backprojection_2d(derivative.contiguous(), **self.geom_2d)
         weight_3d = torch.tensor(weights_3d(self.geom_2d, D=self.geometry.source_detector_distance).copy()).cuda()
         weighted_CB_projection = torch.multiply(CB_projection, weight_3d)
-        '''plt.imshow(weighted_CB_projection[0].cpu())
-        plt.show()'''
+        plt.imshow(weighted_CB_projection[0].cpu())
+        plt.show()
         weighted_CB_projection = torch.unsqueeze(weighted_CB_projection, dim=0)
         reco = self.backprojection_3d(weighted_CB_projection.contiguous(), **self.geometry)
+        reco = self.relu(reco)
 #.cpu().numpy()[0]
         show(reco[0, int(self.geometry.volume_shape[0] / 2), :, :], 'yz')
         show(reco[0, :, int(self.geometry.volume_shape[1] / 2), :], 'xz')
@@ -106,10 +113,12 @@ def weight_initialization(geom_2dm, D):
     c = -1/(8*np.pi**2)
     s = geom_2dm.detector_shape[-1]
     cs = -(s - 1) / 2 * geom_2dm.detector_spacing[-1]
+    angular_increment = 2 * np.pi / geom_2dm.number_of_projections
+    mus = -(geom_2dm.number_of_projections - 1) / 2 * angular_increment
     sd2 = D ** 2
     w = np.zeros((geom_2dm.number_of_projections, s), dtype=np.float32)
     for mu in range(0, geom_2dm.number_of_projections):
-        a = np.cos(0) if mu == 0 else np.abs(np.cos(2 * np.pi / mu))
+        a = np.abs(np.cos(mu*angular_increment-np.pi/2))
         for s in range(0, s):
             ds = (s * geom_2dm.detector_spacing[-1] + cs) ** 2
             w[mu, s] = a*sd2/(sd2+ds)
