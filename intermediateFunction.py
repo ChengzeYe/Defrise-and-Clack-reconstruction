@@ -8,11 +8,11 @@ from pyronn.ct_reconstruction.helpers.trajectories.circular_trajectory import ci
 import matplotlib.pyplot as plt
 
 def intermediate_function(projection, geometry):
-    projection = torch.tensor(projection)# x y plan
-    '''plt.imshow(projection[0])
+    projection = torch.tensor(projection).cuda()# x y plan
+    '''plt.imshow(projection[0].cpu())
     plt.show()'''
-    cosine = torch.tensor(cosine_weights_3d(geometry).copy())
-    weighted_projection = torch.multiply(projection, cosine).cuda()
+    cosine = torch.tensor(cosine_weights_3d(geometry).copy()).cuda()
+    weighted_projection = torch.multiply(projection, cosine)
     geom_2d = geometry_radon_2d(geometry)
     radon_2d = ParallelProjection2D()
     Plan_Integral = radon_2d(weighted_projection, **geom_2d)
@@ -23,12 +23,14 @@ def intermediate_function(projection, geometry):
     plt.show()'''
     weight = torch.tensor(weight_2d(Plan_Integral_Derivative.size(), geom_2d, D=geometry.source_detector_distance).copy()).cuda()
     Plan_Integral_Derivative = torch.multiply(Plan_Integral_Derivative, weight)
-    return Plan_Integral_Derivative#s mu plan
+    '''plt.imshow(Plan_Integral_Derivative[0].cpu())
+    plt.show()'''
+    return Plan_Integral_Derivative# mu s plan
 
 
 def geometry_radon_2d(geometry):
     geom_2d = Geometry()
-    number_of_projections = 120
+    number_of_projections = 360
     source_detector_distance = np.sqrt(
         np.square(geometry.detector_shape[-1] * geometry.detector_spacing[-1]) + np.square(
             geometry.detector_shape[-2] * geometry.detector_spacing[-2]))

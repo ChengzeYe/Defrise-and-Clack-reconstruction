@@ -19,7 +19,7 @@ from typing import Callable, Tuple
 import warnings
 from pyronn.ct_reconstruction.helpers.trajectories.circular_trajectory import circular_trajectory_3d
 # from pyronn.ct_reconstruction.helpers.trajectories.arbitrary_trajectory import arbitrary_projection_matrix
-from arbitrary_trajectory_ls import arbitrary_projection_matrix
+from arbitrary_trajectory_Walnut import arbitrary_projection_matrix
 from importlib.util import find_spec
 
 if find_spec('PythonTools'):

@@ -8,7 +8,7 @@ def weight_2d(size, geometry, D):
     sd2 = D ** 2
     w = np.zeros((geometry.number_of_projections, s), dtype=np.float32)
     for mu in range(0, geometry.number_of_projections):
-        for s in range(0, s):
+        for s in range(0, size[2]):
             ds = (s * geometry.detector_spacing[-1] + cs) ** 2
             w[mu, s] = (ds+sd2) /sd2
     return np.flip(w)
@@ -28,3 +28,5 @@ def weights_3d(geometry, D):
             w[v, u] = dv + du +sd2
 
     return np.flip(w)
+
+
