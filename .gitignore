@@ -3,3 +3,4 @@
 *.yaml
 *.pyc
 *.xml
+.idea
