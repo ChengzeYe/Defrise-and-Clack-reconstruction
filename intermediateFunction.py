@@ -30,7 +30,7 @@ def intermediate_function(projection, geometry):
 
 def geometry_radon_2d(geometry):
     geom_2d = Geometry()
-    number_of_projections = 360
+    number_of_projections = geometry.number_of_projections
     source_detector_distance = np.sqrt(
         np.square(geometry.detector_shape[-1] * geometry.detector_spacing[-1]) + np.square(
             geometry.detector_shape[-2] * geometry.detector_spacing[-2]))

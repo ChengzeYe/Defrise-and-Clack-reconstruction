@@ -15,8 +15,8 @@ class Projections_Dataset(Dataset):
     def __init__(self, data_path, reco_path, objects, **kwargs):
         self.dataset = list()
         self.geom = list()
-        self.geom.append(self.init_geometry())
         self.angluar_sub_sampling = 1
+        self.geom.append(self.init_geometry())
         for entry in os.scandir(data_path):
             self.dataset.extend(torch.load(entry.path)[0:2])
 
@@ -36,7 +36,7 @@ class Projections_Dataset(Dataset):
         detector_spacing = (0.1496, 0.1496)
 
         # Trajectory Parameters:
-        number_of_projections = 360
+        number_of_projections = 360//self.angluar_sub_sampling
         angular_range = 2 * np.pi
 
         sdd = 199.006195
@@ -59,7 +59,7 @@ class Projections_Dataset(Dataset):
     def __getitem__(self, index):
         """ Returns one instance of the dataset including image, target, weight and path."""
         #sample_index = np.random.randint(len(self.dataset))
-        sample_index = 0
+        sample_index = 1
         volume_sample, sinogram_sample = self.dataset[sample_index]
         volume_sample = torch.squeeze(volume_sample, dim=0).cpu().numpy()
         sinogram_sample = torch.squeeze(sinogram_sample, dim=0)[:: self.angluar_sub_sampling, :, :].cpu().numpy()

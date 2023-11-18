@@ -8,6 +8,7 @@ from pyronn.ct_reconstruction.layers.backprojection_3d import ConeBackProjection
 from weight import weights_3d
 import matplotlib.pyplot as plt
 from intermediateFunction import intermediate_function, geometry_radon_2d
+from visualization import visualization1
 
 
 class Pipeline(pl.LightningModule):
@@ -19,7 +20,8 @@ class Pipeline(pl.LightningModule):
         self.geom_2d = geometry_radon_2d(geometry)
         self.learningRate = learning_rate
         #self.weight_init = -torch.ones((geometry.number_of_projections, self.geom_2d.number_of_projections, self.geom_2d.detector_shape[-1]))  # 这里应该是个3D的
-        self.weight_init = torch.tensor(weight_initialization(self.geom_2d, D=self.geometry.source_detector_distance))
+        self.weight_init = -torch.rand((self.geom_2d.number_of_projections, self.geom_2d.detector_shape[-1]))
+        #self.weight_init = torch.tensor(weight_initialization(self.geom_2d, D=self.geometry.source_detector_distance))
         #self.weight_init = torch.tensor(np.load(r'E:\MasterArbeit\code\Defrise-and-Clack-reconstruction\redundancy_weight_60_100_circular.npy'))
         #self.weight_init1 = torch.tensor(np.load(r'E:\MasterArbeit\code\Defrise-and-Clack-reconstruction\redundancy_weight.npy'))
 
@@ -38,6 +40,7 @@ class Pipeline(pl.LightningModule):
 
     def training_step(self, batch, batch_idx):
         sinogram = batch[0]
+        # ground_truth = batch[1]
         ground_truth = preprocessing(batch[1])
         output = self.forward(sinogram)
         output = preprocessing(output)
@@ -50,31 +53,57 @@ class Pipeline(pl.LightningModule):
         self.ground_truth = preprocessing(batch[1])
         self.output = self.forward(sinogram)
         self.output = preprocessing(self.output)
-        reco = self.output
+
+        '''reco = self.output
         show(reco[0, int(self.geometry.volume_shape[0] / 2), :, :], 'yz')
         show(reco[0, :, int(self.geometry.volume_shape[1] / 2), :], 'xz')
         show(reco[0, :, :, int(self.geometry.volume_shape[2] / 2)], 'xy')
         reco1 = self.ground_truth
         show(reco1[0, int(self.geometry.volume_shape[0] / 2), :, :], 'yz')
         show(reco1[0, :, int(self.geometry.volume_shape[1] / 2), :], 'xz')
-        show(reco1[0, :, :, int(self.geometry.volume_shape[2] / 2)], 'xy')
+        show(reco1[0, :, :, int(self.geometry.volume_shape[2] / 2)], 'xy')'''
+
         loss = self.loss_fn(self.output, self.ground_truth)
         self._validation_loss_agg.update(loss)
         return loss
 
     def on_train_epoch_end(self):
         train_loss_value = self._train_loss_agg.compute().cpu().detach().numpy()
-        self.log("Train Loss", train_loss_value)
+        self.log("Train Loss", float(train_loss_value))
         self.train_loss.append(train_loss_value)
         print("Train loss", train_loss_value)
         self._train_loss_agg.reset()
 
     def on_validation_epoch_end(self):
         validation_loss_value = self._validation_loss_agg.compute().cpu().detach().numpy()
-        self.log("Validation Loss", validation_loss_value)
+        self.log("Validation Loss", float(validation_loss_value))
         self.validation_loss.append(validation_loss_value)
         print("Validation loss", validation_loss_value)
         self._validation_loss_agg.reset()
+        # log images to wandb
+        if self.current_epoch % 5 == 0:
+            print("PReLU parameter: ", self.DandCrecon.prelu.weight.detach().cpu().numpy())
+
+            visualization1(self.DandCrecon.weight.cpu().detach().numpy())
+
+            plt.subplot(1, 2, 1)
+            plt.imshow(self.output[0, self.geometry.volume_shape[-1] // 2, :, :].cpu().detach().numpy(), cmap='gray')
+            plt.title('reconstructed volume')
+            plt.subplot(1, 2, 2)
+            plt.imshow(self.ground_truth[0, self.geometry.volume_shape[-1] // 2, :, :].cpu().detach().numpy(), cmap='gray')  # 替换 'additional_data' 变量
+            plt.title('Ground Truth')
+            plt.legend()
+            plt.savefig('reconstructed volume.png')
+            #plt.show()
+            plt.clf()
+            self.logger.log_image(key="3D Surface Plot(learned weight)", images=['3D Surface Plot(learned weight).png'],
+                                  caption=[f"3D_Surface_Plot(learned_weight)_{self.current_epoch}"])
+            self.logger.log_image(key="learned weight line profile", images=['learned weight line profile.png'],
+                                  caption=[f"learned_weight_line_profile_{self.current_epoch}"])
+            self.logger.log_image(key="reconstructed volume", images=['reconstructed volume.png'],
+                                  caption=[f"reconstructed_volume_{self.current_epoch}"])
+
+
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), lr=self.learningRate)
@@ -86,16 +115,16 @@ class DandCrecon(torch.nn.Module):
     def __init__(self, geometry, weight_init, geom_2d):
         super(DandCrecon, self).__init__()
         self.geometry = geometry
-        self.weight_init = torch.nn.Parameter(weight_init.float(), requires_grad=True)
+        self.weight = torch.nn.Parameter(weight_init.float(), requires_grad=True)
         self.geom_2d = geom_2d
         self.backprojection_2d = ParallelBackProjection2D()
         self.backprojection_3d = ConeBackProjection3D()
-        self.relu = torch.nn.ReLU()
+        self.prelu = torch.nn.PReLU(num_parameters=1, init=0.25)
 
     def forward(self, sinogram):#这里predict 和 fit 输入进来的不同 predict的时候需要[0]
         '''plt.imshow(sinogram[0][0].cpu())
         plt.show()'''
-        weighted_sinogram = torch.multiply(sinogram, self.weight_init)
+        weighted_sinogram = torch.multiply(sinogram[0], self.weight)
         derivative = torch.gradient(weighted_sinogram, dim=3)[0]
         derivative = torch.squeeze(derivative, dim=0)
         '''plt.imshow(derivative[0].cpu())
@@ -107,7 +136,7 @@ class DandCrecon(torch.nn.Module):
         plt.show()'''
         weighted_CB_projection = torch.unsqueeze(weighted_CB_projection, dim=0)
         reco = self.backprojection_3d(weighted_CB_projection.contiguous(), **self.geometry)
-        #reco = self.relu(reco)
+        reco = self.prelu(reco)
 #.cpu().numpy()[0]
 
         return reco
