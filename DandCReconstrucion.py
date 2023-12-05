@@ -9,7 +9,7 @@ from weight import weights_3d
 import matplotlib.pyplot as plt
 from intermediateFunction import intermediate_function, geometry_radon_2d
 from visualization import visualization1
-
+import torch.nn.functional as F
 
 class Pipeline(pl.LightningModule):
     def __init__(self, geometry, learning_rate, num_data, num_epoch):
@@ -19,7 +19,9 @@ class Pipeline(pl.LightningModule):
         self.num_epoch = num_epoch
         self.geom_2d = geometry_radon_2d(geometry)
         self.learningRate = learning_rate
-        #self.weight_init = -torch.ones((geometry.number_of_projections, self.geom_2d.number_of_projections, self.geom_2d.detector_shape[-1]))  # 这里应该是个3D的
+        self.number_of_projections_train = self.geometry.number_of_projections
+        self.number_of_projections_validation = 1200
+        #self.weight_init = -torch.ones((self.geom_2d.number_of_projections, self.geom_2d.detector_shape[-1]))  # 这里应该是个3D的
         self.weight_init = -torch.rand((self.geom_2d.number_of_projections, self.geom_2d.detector_shape[-1]))
         #self.weight_init = torch.tensor(weight_initialization(self.geom_2d, D=self.geometry.source_detector_distance))
         #self.weight_init = torch.tensor(np.load(r'E:\MasterArbeit\code\Defrise-and-Clack-reconstruction\redundancy_weight_60_100_circular.npy'))
@@ -39,6 +41,7 @@ class Pipeline(pl.LightningModule):
         return recon_image
 
     def training_step(self, batch, batch_idx):
+        self.geometry.number_of_projections = self.number_of_projections_train
         sinogram = batch[0]
         # ground_truth = batch[1]
         ground_truth = preprocessing(batch[1])
@@ -49,6 +52,7 @@ class Pipeline(pl.LightningModule):
         return loss
 
     def validation_step(self, batch, batch_idx):
+        self.geometry.number_of_projections = self.number_of_projections_validation
         sinogram = batch[0]
         self.ground_truth = preprocessing(batch[1])
         self.output = self.forward(sinogram)
@@ -119,17 +123,36 @@ class DandCrecon(torch.nn.Module):
         self.geom_2d = geom_2d
         self.backprojection_2d = ParallelBackProjection2D()
         self.backprojection_3d = ConeBackProjection3D()
-        self.prelu = torch.nn.PReLU(num_parameters=1, init=0.25)
+        self.prelu = torch.nn.PReLU(num_parameters=1, init=0.8)
+        #self.relu = torch.nn.ReLU()
+        self.sobel = torch.tensor([[1, 0, -1], [2, 0, -2], [1, 0, -1]], dtype=torch.float32).cuda()
+
 
     def forward(self, sinogram):#这里predict 和 fit 输入进来的不同 predict的时候需要[0]
-        '''plt.imshow(sinogram[0][0].cpu())
+        '''plt.imshow(-sinogram[0][0].cpu())
         plt.show()'''
         weighted_sinogram = torch.multiply(sinogram[0], self.weight)
-        derivative = torch.gradient(weighted_sinogram, dim=3)[0]
+        ################################
+        '''weighted_sinogram = torch.autograd.Variable(weighted_sinogram, requires_grad=True)
+        grad_outputs = torch.zeros_like(weighted_sinogram)
+        derivative = torch.autograd.grad(outputs=weighted_sinogram, inputs=weighted_sinogram, grad_outputs=grad_outputs, create_graph=True)[0]
         derivative = torch.squeeze(derivative, dim=0)
+        plt.imshow(derivative[0].cpu())
+        plt.show()'''
+
+        a = weighted_sinogram
+        a = torch.squeeze(a, dim=0)
+        filtered_sinogramm = torch.gradient(a, dim=2)[0]
+
         '''plt.imshow(derivative[0].cpu())
         plt.show()'''
-        CB_projection = self.backprojection_2d(derivative.contiguous(), **self.geom_2d)
+
+        '''filtered_sinogramm = F.conv2d(weighted_sinogram.permute(1, 0, 2, 3), self.sobel.view(1, 1, 3, 3), stride=1, padding=1)
+        filtered_sinogramm = torch.squeeze(filtered_sinogramm, dim=1)'''
+
+        '''plt.imshow(filtered_sinogramm[0].cpu())
+        plt.show()'''
+        CB_projection = self.backprojection_2d(filtered_sinogramm.contiguous(), **self.geom_2d)
         weight_3d = torch.tensor(weights_3d(self.geom_2d, D=self.geometry.source_detector_distance).copy()).cuda()
         weighted_CB_projection = torch.multiply(CB_projection, weight_3d)
         '''plt.imshow(weighted_CB_projection[0].cpu())
@@ -137,6 +160,7 @@ class DandCrecon(torch.nn.Module):
         weighted_CB_projection = torch.unsqueeze(weighted_CB_projection, dim=0)
         reco = self.backprojection_3d(weighted_CB_projection.contiguous(), **self.geometry)
         reco = self.prelu(reco)
+        #reco = self.relu(reco)
 #.cpu().numpy()[0]
 
         return reco

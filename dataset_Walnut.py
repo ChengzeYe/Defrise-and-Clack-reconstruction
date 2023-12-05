@@ -12,10 +12,10 @@ from intermediateFunction import intermediate_function, geometry_radon_2d
 import cupy as cp
 
 
-class Projections_Dataset(Dataset):
+class Projections_Dataset_Walnut(Dataset):
     '''Dataset used during training of the network.'''
 
-    def __init__(self, data_path, reco_path, objects, **kwargs):
+    def __init__(self, data_path_validation,  **kwargs):
 
         self.images = list()
         self.headers = list()
@@ -24,14 +24,14 @@ class Projections_Dataset(Dataset):
         self.geom = list()
         # define a sub-sampling factor in angular direction
         # (all reference reconstructions are computed with full angular resolution)
-        self.angluar_sub_sampling = 12
+        self.angluar_sub_sampling = 3
         # select of voxels per mm in one direction (higher = larger res)
         # (all reference reconstructions are computed with 10)
         self.voxel_per_mm = 20
         self.projs_rows = 972
         self.projs_cols = 768
         self.geom_2d = None
-        data_path = reco_path
+        data_path = data_path_validation
         for entry in os.scandir(data_path):
             self.loadProjections(entry.path)
             self.loadReconstruction(entry.path)

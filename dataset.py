@@ -7,20 +7,30 @@ from pyronn.ct_reconstruction.geometry.geometry import Geometry
 from pyronn.ct_reconstruction.helpers.trajectories.circular_trajectory import circular_trajectory_3d
 #import matplotlib.pyplot as plt
 from intermediateFunction import intermediate_function, geometry_radon_2d
+import h5py
+import gzip
 
 
 class Projections_Dataset(Dataset):
     '''Dataset used during training of the network.'''
 
-    def __init__(self, data_path, reco_path, objects, **kwargs):
+    def __init__(self, data_path_train,  **kwargs):
         self.dataset = list()
         self.geom = list()
         self.angluar_sub_sampling = 1
         self.geom.append(self.init_geometry())
-        for entry in os.scandir(data_path):
-            self.dataset.extend(torch.load(entry.path)[0:2])
+        for entry in os.scandir(data_path_train):
+            self.load_data(entry.path)
 
 #  一个长度为十的list 每个元素是个元组，元素1是 1， 501，501，501  元素二是1，360，972 768 别忘记翻转xy轴
+    def load_data(self, path):
+        with h5py.File(path, 'r') as file:
+            sinogram = file['sinogram_0'][()]
+            volume = file['volume_0'][()]
+        data = torch.tensor(volume), torch.tensor(sinogram)
+        self.dataset.append(data)
+        return data
+
 
     def init_geometry(self):
         voxel_per_mm = 10
