@@ -18,7 +18,6 @@ def main(cfg: DictConfig):
     validation_dataloader = DataLoader(validation_dataset, batch_size=params['batch_size'], shuffle=False,
                                        num_workers=0)
     geometry = dataset.geom[0]
-    print("Parameter loaded")
 
     model = Pipeline(geometry=geometry, learning_rate=params['base_lr'], num_data=train_dataset.__len__(),
                      num_epoch=params['num_epochs'])

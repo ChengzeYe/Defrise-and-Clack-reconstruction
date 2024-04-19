@@ -19,10 +19,9 @@ class Pipeline(pl.LightningModule):
         self.geom_2d = geometry_radon_2d(geometry)
         self.learningRate = learning_rate
 
-        self.weight_init = -torch.rand((self.geom_2d.number_of_projections, self.geom_2d.detector_shape[-1]))
-        self.weight_init = -torch.rand(
-            (self.geometry.number_of_projections, self.geom_2d.number_of_projections, self.geom_2d.detector_shape[-1]))
-        self.weight_init = torch.tensor(weight_initialization(self.geom_2d, D=self.geometry.source_isocenter_distance))
+        # self.weight_init = -torch.rand((self.geom_2d.number_of_projections, self.geom_2d.detector_shape[-1]))  # When the orbit is a circular orbit
+        # self.weight_init = -torch.rand((self.geometry.number_of_projections, self.geom_2d.number_of_projections, self.geom_2d.detector_shape[-1]))  # When the orbit is a non-circular orbit
+        self.weight_init = torch.tensor(weight_initialization(self.geom_2d, D=self.geometry.source_isocenter_distance))  # Use analytic redundancy weight
 
         self.DandCrecon = DandCrecon(geometry=self.geometry, weight_init=self.weight_init, geom_2d=self.geom_2d)
         self.loss_fn = torch.nn.MSELoss()
@@ -98,7 +97,7 @@ class DandCrecon(torch.nn.Module):
     def forward(self, sinogram):
         if isinstance(sinogram, list):
             sinogram = sinogram[0]
-            weight = TF.gaussian_blur(self.weight.unsqueeze(0).unsqueeze(0), kernel_size=31, sigma=20).squeeze(
+            weight = TF.gaussian_blur(self.weight.unsqueeze(0).unsqueeze(0), kernel_size=21, sigma=5).squeeze(
                 0).squeeze(0)
 
         else:
@@ -133,7 +132,7 @@ def weight_initialization(geom_2dm, D):
     c = -1 / (8 * np.pi ** 2)
     s = geom_2dm.detector_shape[-1]
     cs = -(s - 1) / 2 * geom_2dm.detector_spacing[-1]
-    angular_increment = np.pi / geom_2dm.number_of_projections
+    angular_increment = 2 * np.pi / geom_2dm.number_of_projections
     sd2 = D ** 2
     w = np.zeros((geom_2dm.number_of_projections, geom_2dm.detector_shape[-1]), dtype=np.float32)
     for mu in range(0, geom_2dm.number_of_projections):

@@ -9,7 +9,7 @@ from weight import weight_2d
 
 def intermediate_function(projection, geometry):
     """
-        Calculate the Grangeat’s intermediate function.
+        Calculate the Grangeat's intermediate function.
 
         Parameters:
         - projection (array): The Cone beam projection data.
@@ -50,7 +50,7 @@ def geometry_radon_2d(geometry):
     detector_spacing = geometry.detector_spacing[-1]
     geom_2d.init_from_parameters(volume_shape=geometry.detector_shape, volume_spacing=geometry.detector_spacing,
                                  detector_shape=[detector_shape], detector_spacing=[detector_spacing],
-                                 number_of_projections=number_of_projections, angular_range=[0, np.pi],
+                                 number_of_projections=number_of_projections, angular_range=[0, 2*np.pi],
                                  trajectory=circular_trajectory_2d,
                                  source_isocenter_distance=source_detector_distance // 2,
                                  source_detector_distance=source_detector_distance)

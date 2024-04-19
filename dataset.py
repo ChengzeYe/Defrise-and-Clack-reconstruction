@@ -58,7 +58,7 @@ class Projections_Dataset(Dataset):
         detector_spacing = (0.1496, 0.1496)
 
         # Trajectory Parameters:
-        number_of_projections = 360 // self.angluar_sub_sampling
+        number_of_projections = 400 // self.angluar_sub_sampling
         angular_range = 2 * np.pi
 
         sdd = 199.006195
