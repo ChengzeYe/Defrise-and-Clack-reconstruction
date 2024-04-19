@@ -50,5 +50,5 @@ This repository is organized as follows:
 ```
 ## Acknowledgments
 
-- Thanks to [sypsyp97](https://github.com/sypsyp97) for his [Eagle_Loss]((https://github.com/sypsyp97/Eagle_Loss)), which was a great reference in building this application.
+- Thanks to [sypsyp97](https://github.com/sypsyp97) for his [Eagle_Loss](https://github.com/sypsyp97/Eagle_Loss), which was a great reference in building this application.
 
