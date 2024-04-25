@@ -49,14 +49,14 @@ class Pipeline(pl.LightningModule):
         self.output = self.forward(batch[0])
         self.output = preprocessing(self.output)
 
-        reco = self.output
+        '''reco = self.output
         show(reco[0, int(self.geometry.volume_shape[0] / 2), :, :], 'yz')
         show(reco[0, :, int(self.geometry.volume_shape[1] / 2), :], 'xz')
         show(reco[0, :, :, int(self.geometry.volume_shape[2] / 2)], 'xy')
         reco1 = self.ground_truth
         show(reco1[0, int(self.geometry.volume_shape[0] / 2), :, :], 'yz')
         show(reco1[0, :, int(self.geometry.volume_shape[1] / 2), :], 'xz')
-        show(reco1[0, :, :, int(self.geometry.volume_shape[2] / 2)], 'xy')
+        show(reco1[0, :, :, int(self.geometry.volume_shape[2] / 2)], 'xy')'''
 
         loss = self.loss_fn(self.output, self.ground_truth)
         self._validation_loss_agg.update(loss)
