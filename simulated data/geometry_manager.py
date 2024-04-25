@@ -12,7 +12,7 @@ from pyronn.ct_reconstruction.helpers.phantoms import shepp_logan
 from helpers.primitives_3D import visualize_grid, place_sphere, place_cylinder_with_rotation, place_ellipsoid_with_rotation, place_cube_with_rotation, place_pyramid
 from pyronn.ct_reconstruction.helpers.trajectories.circular_trajectory import circular_trajectory_3d
 from pyronn.ct_reconstruction.helpers.trajectories.arbitrary_trajectory import  arbitrary_projection_matrix
-from helpers.estimate_volume_bounding_box import load_images, calc_binary_volume
+
 
 
 class CircularGeometrys3D:
@@ -222,7 +222,7 @@ class ArbitraryGeometrys3D:
         visualize_grid(grid)
         return mask, sinogram
     
-
+# This class needs to be adjusted accordingly depending on the structure of your measured data!
 class MeasuredGeometry3D:
 
     def __init__(self,path):
@@ -230,8 +230,7 @@ class MeasuredGeometry3D:
         Initializes a Measured Geometry object with specified imaging geometry parameters.
 
         Parameters:
-        - volume_shape: Tuple or list specifying the shape (dimensions) of the volume to be imaged.
-        - volume_spacing (mm): Tuple or list specifying the spacing between voxels in each dimension of the volume.
+        - path: Path to the dictionary of imaging information (header) of the respective scan.
         """
         headers,projections = load_images(path)
         traj_type = 'circ' if np.array_equal(np.array(headers[0].agv_source_position),np.array([0,0,0])) else 'free'
@@ -257,33 +256,24 @@ class MeasuredGeometry3D:
             self.geometry.init_from_parameters(volume_shape=volume_shape,volume_spacing=volume_spacing,
                                 detector_shape=detector_shape,detector_spacing=[pixel_pitch_in_mm,pixel_pitch_in_mm],
                                 number_of_projections=number_of_projections,angular_range=angular_range,
-                                trajectory=arbitrary_projection_matrix, #changed for testing the realworld dataset
+                                trajectory=arbitrary_projection_matrix,
                                 source_isocenter_distance=source_isocenter_distance, source_detector_distance=source_detector_distance,swap_detector_axis=True)
 
         self.projections = projections
         self.headers = headers
 
-    def generate_mask_and_sinogram(self):
-        mask,number_of_voxel_object = calc_binary_volume(images=self.projections,headers=self.headers,
-                                  voxel_size_in_mm = self.geometry.volume_spacing,volume_voxel_count=self.geometry.volume_shape[0])
-        
-
-        
-        mask = torch.tensor(mask).cuda()
-        self.geometry.set_volume_shape((number_of_voxel_object+2,number_of_voxel_object+2,number_of_voxel_object+2))
-        
+    def generate_sinogram(self)        
         sinogram = self.build_sinogram(self.projections).cuda()
         
-        return mask, sinogram
+        return  sinogram
 
     def build_sinogram(self,images):
         n = len(images)
         width, height = images[0].shape
         out = np.zeros((n, width, height), dtype=np.float32)
         for i in range(0, n):
-            max_value = 64000
-            out[i, :, :] = -np.log(np.array(images[i], dtype=np.float32)/max_value) *10  #
-            # out[i, :, :] = (max_value- np.array(images[i], dtype=np.float32))#/max_value
+            max_value = 65535 # Assuming UINT16 data format
+            out[i, :, :] = -np.log(np.array(images[i], dtype=np.float32)/max_value) *10 
         return torch.tensor(np.expand_dims(out, axis=0))
 
 
