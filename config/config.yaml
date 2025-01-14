@@ -1,0 +1,12 @@
+#Training
+test_size: 0.2
+batch_size: 1
+base_lr: 1e-4
+num_epochs: 1000
+k: 100
+checkpoints_path: 
+
+#Dataloader
+data_path_train:  
+data_path_validation: 
+
