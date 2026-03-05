@@ -1,7 +1,9 @@
 # Defrise and Clack Neural Network
 [![arXiv](https://img.shields.io/badge/arXiv-2403.00426-b31b1b.svg)](https://arxiv.org/abs/2403.00426)
+[![Physics in Medicine & Biology](https://img.shields.io/badge/PMB-Journal%20Paper-blue)](https://iopscience.iop.org/article/10.1088/1361-6560/adbb50)
 
-PyTorch implementation of the paper ["Deep Learning Computed Tomography based on the Defrise and Clack Algorithm"](https://arxiv.org/abs/2403.00426). This repository includes the code for a data-driven methodology for reconstructing CBCT projections for a given orbit.
+PyTorch implementation of the conference paper ["Deep Learning Computed Tomography based on the Defrise and Clack Algorithm"](https://arxiv.org/abs/2403.00426) and the journal version of this work ["DRACO: Differentiable Reconstruction for Arbitrary CBCT Orbits"](https://iopscience.iop.org/article/10.1088/1361-6560/adbb50/meta). 
+This repository includes the code for a data-driven methodology for reconstructing CBCT projections for a given orbit.
 
 ## Requirements
 
@@ -46,6 +48,16 @@ This repository is organized as follows:
   author={Ye, Chengze and Schneider, Linda-Sophie and Sun, Yipeng and Maier, Andreas},
   journal={arXiv preprint arXiv:2403.00426},
   year={2024}
+}
+@article{ye2025draco,
+  title={DRACO: differentiable reconstruction for arbitrary CBCT orbits},
+  author={Ye, Chengze and Schneider, Linda-Sophie and Sun, Yipeng and Thies, Mareike and Mei, Siyuan and Maier, Andreas},
+  journal={Physics in Medicine \& Biology},
+  volume={70},
+  number={7},
+  pages={075005},
+  year={2025},
+  publisher={IOP Publishing}
 }
 ```
 ## Acknowledgments
